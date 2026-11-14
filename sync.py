@@ -1,28 +1,33 @@
 """
-FusionSolar -> Google Sheet sync (single run).
-Run it from any scheduler every 15 minutes (cron, GitHub Actions, Task Scheduler...).
+FusionSolar -> Google Sheet sync (writes straight to Sheets, no Apps Script needed).
 
-Settings come from environment variables (use these on hosting).
-The defaults below are only for local testing; never share this file with real values filled in.
+Usage:
+    python sync.py live    # every 15 minutes: performance, devices, alarms, Latest_Plants
+    python sync.py daily   # once a day (~23:55 PKT): plant/device lists, Daily_History, cleanup of old rows
+    python sync.py all     # daily + live (use for the very first run)
+
+Settings come from environment variables (use these on hosting):
+    FS_BASE, FS_USER, FS_SYSCODE, SHEET_ID,
+    GOOGLE_SA_JSON (full contents of the service-account json)  OR  GOOGLE_SA_FILE (path to the json file)
+Optional: RETENTION_DAYS (default 7), ALARM_LOOKBACK_HOURS (default 24)
 """
+import json
 import os
 import sys
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import gspread
 import requests
 
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE = os.getenv("FS_BASE", "https://intl.fusionsolar.huawei.com/thirdData")
 USER = os.getenv("FS_USER", "google_sheets_sync")
-SYSCODE = os.getenv("FS_SYSCODE", "System Code For api")
-SHEET_ID = os.getenv("SHEET_ID", "Your Sheet Id")
+SYSCODE = os.getenv("FS_SYSCODE", "YAHAN_SYSTEM_CODE")
+SHEET_ID = os.getenv("SHEET_ID", "YAHAN_GOOGLE_SHEET_ID")
 SA_FILE = os.getenv("GOOGLE_SA_FILE", os.path.join(HERE, "service_account.json"))
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
 ALARM_LOOKBACK_H = int(os.getenv("ALARM_LOOKBACK_HOURS", "24"))
-
 
 PKT = timezone(timedelta(hours=5))  # Pakistan, no DST
 INVERTER_TYPES = {1, 38}           # device types whose active_power counts as generation
