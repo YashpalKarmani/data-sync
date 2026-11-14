@@ -13,6 +13,7 @@ Optional: RETENTION_DAYS (default 7), ALARM_LOOKBACK_HOURS (default 24)
 """
 import json
 import os
+import socket
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -36,6 +37,49 @@ SKIP_TYPES = {62}                  # dongle: no real-time KPI from Huawei
 DEFAULT_CITIES = ["Karachi", "Hyderabad", "Lahore", "Islamabad", "Rawalpindi", "Faisalabad",
                   "Multan", "Peshawar", "Quetta", "Sialkot", "Gujranwala", "Sukkur"]
 HEALTH = {1: "Offline", 2: "Faulty", 3: "Healthy"}
+
+
+# ------------------------------------------------------------------ DNS fallback
+# Some cloud servers (GitHub Actions, Google Apps Script) cannot resolve Huawei's hostname with their default DNS.
+# If the normal lookup fails for a *.huawei.com host, ask public DNS-over-HTTPS (Google / Cloudflare) instead.
+_orig_getaddrinfo = socket.getaddrinfo
+_doh_cache = {}
+
+
+def _doh_lookup(host):
+    if host in _doh_cache:
+        return _doh_cache[host]
+    ips = []
+    for url in ("https://dns.google/resolve", "https://cloudflare-dns.com/dns-query"):
+        try:
+            r = requests.get(url, params={"name": host, "type": "A"},
+                             headers={"accept": "application/dns-json"}, timeout=15)
+            ips = [a["data"] for a in r.json().get("Answer", []) if a.get("type") == 1]
+            if ips:
+                break
+        except Exception as e:
+            print(f"DNS-over-HTTPS via {url} failed: {e}")
+    _doh_cache[host] = ips
+    print(f"DNS fallback for {host}: {ips if ips else 'no address found'}")
+    return ips
+
+
+def _getaddrinfo(host, *args, **kwargs):
+    try:
+        return _orig_getaddrinfo(host, *args, **kwargs)
+    except socket.gaierror:
+        if not (isinstance(host, str) and host.endswith("huawei.com")):
+            raise
+        ips = _doh_lookup(host)
+        if not ips:
+            raise
+        out = []
+        for ip in ips:
+            out += _orig_getaddrinfo(ip, *args, **kwargs)
+        return out
+
+
+socket.getaddrinfo = _getaddrinfo
 
 
 # ------------------------------------------------------------------ helpers
