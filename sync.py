@@ -21,13 +21,14 @@ import gspread
 import requests
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BASE = os.getenv("FS_BASE", "https://intl.fusionsolar.huawei.com/thirdData")
-USER = os.getenv("FS_USER", "google_sheets_sync")
-SYSCODE = os.getenv("FS_SYSCODE", "YAHAN_SYSTEM_CODE")
-SHEET_ID = os.getenv("SHEET_ID", "YAHAN_GOOGLE_SHEET_ID")
-SA_FILE = os.getenv("GOOGLE_SA_FILE", os.path.join(HERE, "service_account.json"))
-RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
-ALARM_LOOKBACK_H = int(os.getenv("ALARM_LOOKBACK_HOURS", "24"))
+# "or" (not a getenv default) so that EMPTY variables, e.g. an unset GitHub secret, also fall back to the default
+BASE = os.getenv("FS_BASE") or "https://intl.fusionsolar.huawei.com/thirdData"
+USER = os.getenv("FS_USER") or "google_sheets_sync"
+SYSCODE = os.getenv("FS_SYSCODE") or "YAHAN_SYSTEM_CODE"
+SHEET_ID = os.getenv("SHEET_ID") or "YAHAN_GOOGLE_SHEET_ID"
+SA_FILE = os.getenv("GOOGLE_SA_FILE") or os.path.join(HERE, "service_account.json")
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS") or "7")
+ALARM_LOOKBACK_H = int(os.getenv("ALARM_LOOKBACK_HOURS") or "24")
 
 PKT = timezone(timedelta(hours=5))  # Pakistan, no DST
 INVERTER_TYPES = {1, 38}           # device types whose active_power counts as generation
